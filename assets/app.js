@@ -12,6 +12,18 @@
   const show = (id, yes=true) => $(id).classList.toggle('hidden', !yes);
   const stateOptions = (selected='') => STATES.map(([id,n])=>`<option value="${id}" ${selected===id?'selected':''}>${esc(n)}</option>`).join('');
   const normalization = s => String(s || '').toLowerCase().replace(/&/g,'and').replace(/\bdept\b/g,'department').replace(/\bpd\b/g,'police department').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+  // Conservative sales-target classifier; intentionally excludes agencies without
+  // a clear patrol/report-writing function. It is a heuristic, not an official FBI field.
+  function isOutreachTarget(record){
+    const name=String(record.name||'').toLowerCase();
+    const type=String(record.agency_type||'').toLowerCase();
+    if(/federal|university|college/.test(type))return false;
+    if(/\b(corrections?|correctional|probation|parole|detention|prison|jail|court|prosecutor|district attorney|attorney general|animal (welfare|control)|humane society|wildlife|fish (and|&) game|tax commission|fire department|fire rescue|medical examiner|department of motor vehicles)\b/.test(name))return false;
+    if(/\b(university|college|campus|community college|school district)\b/.test(name))return false;
+    if(/\b(police|sheriffs?|highway patrol|state patrol|constables?|marshals?|law enforcement|public safety|peace officers?)\b/.test(name))return true;
+    if(/^(city|city police|county|state police|tribal)$/.test(type))return true;
+    return false;
+  }
   const getErr = res => { if (res.error) throw res.error; return res.data; };
   const closeDrawer = () => {show('overlay',false); $('overlay').setAttribute('aria-hidden','true');};
   const openDrawer = (title, body, eyebrow='AGENCY DETAILS') => { $('drawer-title').textContent=title;$('drawer-eyebrow').textContent=eyebrow;$('drawer-content').innerHTML=body;show('overlay');$('overlay').setAttribute('aria-hidden','false');$('close-drawer').focus(); };
@@ -197,14 +209,17 @@
 
   // Import a local CSV, preserving existing outreach records via ignoreDuplicates=true.
   function openImport(){
-    openDrawer('Import nationwide roster',`<p class="drawer-desc">Populate the directory with approximately 19,600 FBI-listed law-enforcement agencies covering all 50 states and DC.</p>
+    openDrawer('Import nationwide roster',`<p class="drawer-desc">Import police departments, sheriffs’ offices, highway patrol, state police and similar patrol agencies from the nationwide FBI directory.</p>
       <div class="warning">This is a broad FBI agency directory, not a guaranteed current list of every active police department. It includes sheriffs, special agencies and other law-enforcement entities. Verify individual prospects before outreach.</div>
       <div class="section-label">STEP 1 — DOWNLOAD THE SOURCE</div>
       <p class="helper">Download the free, CC0 FBI-derived roster from IROPO (retrieved September 2026). It contains agency names, state, ORI, and type — not personal contact emails.</p>
       <a class="button outline" href="https://iropo.org/data/agencies.csv" target="_blank" rel="noopener noreferrer">↓ Download nationwide agencies.csv</a>
       <div class="section-label">STEP 2 — SELECT THE DOWNLOADED CSV</div>
       <div class="import-drop"><strong>Upload agencies.csv</strong><span class="helper">CSV with columns for agency ORI, name and state</span><input type="file" id="roster-file" accept=".csv,text/csv"></div>
-      <div id="import-controls" class="hidden"><div class="section-label">STEP 3 — MATCH COLUMNS</div><div class="import-mapping" id="import-mapping"></div>
+      <div id="import-controls" class="hidden"><div class="section-label">STEP 3 — SELECT YOUR TARGETS</div>
+      <label class="helper" style="display:flex;align-items:center;gap:10px;margin:9px 0 14px"><input type="checkbox" id="only-targets" checked style="width:18px;height:18px"> <strong>Only import police / sheriff / patrol agencies (recommended)</strong></label>
+      <p class="helper">Automatically excludes federal agencies, corrections, courts, animal control, campus police and other non-target records. This is a name/type-based filter, so review unusual agencies individually.</p>
+      <div class="section-label">STEP 4 — MATCH COLUMNS</div><div class="import-mapping" id="import-mapping"></div>
       <div class="preview-box" id="import-preview"></div><p id="import-summary" class="helper"></p><div class="progress-track"><div id="import-progress" class="progress-fill"></div></div><div class="drawer-actions"><button id="start-import" class="button primary">Import to shared database →</button></div></div>
       <div class="section-label">IMPORTANT</div><p class="helper">Already-recorded cold calls, emails, LinkedIn checkmarks and notes are preserved. Reimporting an existing ORI will not erase your outreach work.</p>`,'NATIONWIDE DATA');
     let parsed=[],head=[];const mapKeys=['ori','name','state','county','agency_type'];
@@ -217,7 +232,7 @@
         parsed=r.data||[];head=r.meta?.fields||Object.keys(parsed[0]||{});
         $('import-mapping').innerHTML=mapKeys.map(k=>`<label>${esc({ori:'ORI identifier *',name:'Agency name *',state:'State *',county:'County (optional)',agency_type:'Agency type (optional)'}[k])}<select id="map-${k}"><option value="">— Select column —</option>${head.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join('')}</select></label>`).join('');
         mapKeys.forEach(k=>{const found=head.find(h=>aliases[k].includes(normalization(h).replaceAll(' ','_'))) || head.find(h=>aliases[k].includes(h.toLowerCase()));if(found)$('map-'+k).value=found;});
-        $('import-summary').textContent=`${nf(parsed.length)} rows detected. Review column mapping, then import.`;
+        $('import-summary').textContent=`${nf(parsed.length)} source rows detected. Confirm mapping, then import your selected agencies.`;
         $('import-preview').textContent=JSON.stringify(parsed[0]||{},null,2).slice(0,900);show('import-controls');
       },error:e=>toast('CSV read failed: '+e.message,true)});
     });
@@ -225,7 +240,7 @@
       const mapping=Object.fromEntries(mapKeys.map(k=>[k,$('map-'+k).value]));
       if(!mapping.ori||!mapping.name||!mapping.state){toast('Map ORI, name, and state before importing.',true);return;}
       const seen=new Set(),invalid=[];
-      const normalized=parsed.map((r,i)=>{
+      const allValid=parsed.map((r,i)=>{
         const ori=String(r[mapping.ori]||'').trim().toUpperCase();
         const name=String(r[mapping.name]||'').trim();
         const rawState=String(r[mapping.state]||'').trim();
@@ -234,7 +249,11 @@
         seen.add(ori);
         return {ori,name,state:found[0],county:String(mapping.county?r[mapping.county]||'':'').trim().slice(0,300),agency_type:String(mapping.agency_type?r[mapping.agency_type]||'':'').trim().slice(0,300),source_url:'https://iropo.org/sources/'};
       }).filter(Boolean);
-      if(normalized.length===0){toast('No valid records found. Check the column mapping.',true);return;}
+      const onlyTargets=$('only-targets').checked;
+      const normalized=onlyTargets?allValid.filter(isOutreachTarget):allValid;
+      const excluded=allValid.length-normalized.length;
+      if(normalized.length===0){toast('No eligible records found. Check column mapping and target filter.',true);return;}
+      if(onlyTargets && !window.confirm(`Import ${nf(normalized.length)} outreach targets and skip ${nf(excluded)} non-target agencies? Existing records will not be overwritten.`))return;
       const btn=$('start-import');btn.disabled=true;
       let count=0;try{
         for(let i=0;i<normalized.length;i+=200){
@@ -242,7 +261,7 @@
           getErr(await client.from('reconero_agencies').upsert(chunk,{onConflict:'ori',ignoreDuplicates:true}));
           count+=chunk.length;
           $('import-progress').style.width=(100*count/normalized.length).toFixed(1)+'%';
-          $('import-summary').textContent=`Processed ${nf(count)} / ${nf(normalized.length)} agencies · ${nf(invalid.length)} invalid/duplicate rows skipped.`;
+          $('import-summary').textContent=`Processed ${nf(count)} / ${nf(normalized.length)} selected targets · ${nf(excluded)} non-targets excluded · ${nf(invalid.length)} invalid/duplicates skipped.`;
         }
         toast(`Roster import finished: ${nf(count)} agency rows processed.`);
         setTimeout(()=>{closeDrawer();refresh();loadAgencyTypes();},600);
