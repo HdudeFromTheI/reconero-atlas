@@ -12,17 +12,19 @@
   const show = (id, yes=true) => $(id).classList.toggle('hidden', !yes);
   const stateOptions = (selected='') => STATES.map(([id,n])=>`<option value="${id}" ${selected===id?'selected':''}>${esc(n)}</option>`).join('');
   const normalization = s => String(s || '').toLowerCase().replace(/&/g,'and').replace(/\bdept\b/g,'department').replace(/\bpd\b/g,'police department').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
-  // Conservative sales-target classifier; intentionally excludes agencies without
-  // a clear patrol/report-writing function. It is a heuristic, not an official FBI field.
+  // Reconero outreach targets, audited against the FBI/IROPO 19,636-row roster.
+  // Uses source agency type first. Explicit police/constable/ranger names are required
+  // for mixed "other" / "other_state" categories. Heuristic, not individual verification.
   function isOutreachTarget(record){
-    const name=String(record.name||'').toLowerCase();
-    const type=String(record.agency_type||'').toLowerCase();
-    if(/federal|university|college/.test(type))return false;
-    if(/\b(corrections?|correctional|probation|parole|detention|prison|jail|court|prosecutor|district attorney|attorney general|animal (welfare|control)|humane society|wildlife|fish (and|&) game|tax commission|fire department|fire rescue|medical examiner|department of motor vehicles)\b/.test(name))return false;
-    if(/\b(university|college|campus|community college|school district)\b/.test(name))return false;
-    if(/\b(police|sheriffs?|highway patrol|state patrol|constables?|marshals?|law enforcement|public safety|peace officers?)\b/.test(name))return true;
-    if(/^(city|city police|county|state police|tribal)$/.test(type))return true;
-    return false;
+    const name=String(record.name||'').trim().toLowerCase().replace(/&/g,'and');
+    const type=String(record.agency_type||record.type||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+    // In this FBI-derived dataset, university agencies often have school-only names.
+    if(['city','county','state_police','university','tribal'].includes(type))return true;
+    if(!['other','other_state','state_other'].includes(type))return false;
+    // Reject courts, corrections, administrative and fire agencies first.
+    if(/\b(?:corrections?|correctional|probation|parole|detention|jail|prison|prosecutor|district attorney|attorney general|judicial (?:circuit|district)|court(?:s)?|fire|firefighters?|arson|medical examiner|animal control|humane society|drug task force|narcotics (?:task force|unit)|task force|revenue|lottery|tax commission|motor vehicles|training|certification|campus security|school security)\b/.test(name))return false;
+    // Mixed categories are included only with an explicit policing indicator.
+    return /\b(?:police|sheriff'?s?|constable|marshals?|state patrol|highway patrol|transport police|peace officer|law enforcement|public safety|state bureau of investigation|bureau of (?:criminal )?investigation|division of criminal investigation|park rangers?)\b/.test(name);
   }
   const getErr = res => { if (res.error) throw res.error; return res.data; };
   const closeDrawer = () => {show('overlay',false); $('overlay').setAttribute('aria-hidden','true');};
@@ -209,7 +211,7 @@
 
   // Import a local CSV, preserving existing outreach records via ignoreDuplicates=true.
   function openImport(){
-    openDrawer('Import nationwide roster',`<p class="drawer-desc">Import police departments, sheriffs’ offices, highway patrol, state police and similar patrol agencies from the nationwide FBI directory.</p>
+    openDrawer('Import nationwide roster',`<p class="drawer-desc">Import police departments, sheriffs’ offices, highway patrol, university/campus police, tribal police and similar agencies from the nationwide FBI directory.</p>
       <div class="warning">This is a broad FBI agency directory, not a guaranteed current list of every active police department. It includes sheriffs, special agencies and other law-enforcement entities. Verify individual prospects before outreach.</div>
       <div class="section-label">STEP 1 — DOWNLOAD THE SOURCE</div>
       <p class="helper">Download the free, CC0 FBI-derived roster from IROPO (retrieved September 2026). It contains agency names, state, ORI, and type — not personal contact emails.</p>
@@ -217,8 +219,8 @@
       <div class="section-label">STEP 2 — SELECT THE DOWNLOADED CSV</div>
       <div class="import-drop"><strong>Upload agencies.csv</strong><span class="helper">CSV with columns for agency ORI, name and state</span><input type="file" id="roster-file" accept=".csv,text/csv"></div>
       <div id="import-controls" class="hidden"><div class="section-label">STEP 3 — SELECT YOUR TARGETS</div>
-      <label class="helper" style="display:flex;align-items:center;gap:10px;margin:9px 0 14px"><input type="checkbox" id="only-targets" checked style="width:18px;height:18px"> <strong>Only import police / sheriff / patrol agencies (recommended)</strong></label>
-      <p class="helper">Automatically excludes federal agencies, corrections, courts, animal control, campus police and other non-target records. This is a name/type-based filter, so review unusual agencies individually.</p>
+      <label class="helper" style="display:flex;align-items:center;gap:10px;margin:9px 0 14px"><input type="checkbox" id="only-targets" checked style="width:18px;height:18px"> <strong>Only import police / sheriff / campus / patrol agencies (recommended)</strong></label>
+      <p class="helper">Includes university-category agencies even when the name does not say “police”. Reviews mixed other/other_state types by name; excludes courts, corrections, fire marshals and similar non-targets. This is a heuristic, not individual verification.</p>
       <div class="section-label">STEP 4 — MATCH COLUMNS</div><div class="import-mapping" id="import-mapping"></div>
       <div class="preview-box" id="import-preview"></div><p id="import-summary" class="helper"></p><div class="progress-track"><div id="import-progress" class="progress-fill"></div></div><div class="drawer-actions"><button id="start-import" class="button primary">Import to shared database →</button></div></div>
       <div class="section-label">IMPORTANT</div><p class="helper">Already-recorded cold calls, emails, LinkedIn checkmarks and notes are preserved. Reimporting an existing ORI will not erase your outreach work.</p>`,'NATIONWIDE DATA');
