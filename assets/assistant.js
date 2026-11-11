@@ -90,7 +90,19 @@
         if (result.error) {
           const response = result.error.context;
           const info = await response?.json?.().catch(() => null);
-          throw new Error(info?.error || 'Could not reach the Atlas assistant. Check the deployment and try again.');
+          if (info?.code) {
+            throw new Error(info.error + ' [' + info.code + ' · Request ' + info.requestId + ']');
+          }
+          if (response?.status) {
+            const reason = {
+              401: 'Check the function’s legacy JWT setting and sign in again.',
+              404: 'Check that atlas-assistant is deployed in the Supabase project used by this site.',
+              546: 'Check the function logs for a runtime limit.',
+            }[response.status] || 'Check the Edge Function deployment and logs in Supabase.';
+            throw new Error('Supabase returned HTTP ' + response.status + '. ' + reason +
+              ' [ATLAS_GATEWAY_' + response.status + ']');
+          }
+          throw new Error('The browser could not read a response. Check the allowed site origin, function URL, and Network tab. [ATLAS_BROWSER_FETCH]');
         }
         if (active !== controller || getUser()?.id !== userId) return;
         const article = message('Atlas assistant', result.data.answer);
