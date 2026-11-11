@@ -45,3 +45,20 @@
 @media(max-width:760px){.team-heading{align-items:start;flex-direction:column}.team-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.team-section-card{padding:15px}.log-buttons{grid-template-columns:1fr 1fr 1fr}}
 
 .agency-legend{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:0 24px 17px}.agency-legend .member-key{font-size:10px;padding:5px 8px}.agency-legend .who-dot{width:15px;height:15px;font-size:9px}.legacy-key{color:#8498ad;font-size:10px}
+
+.assistant-panel { max-width: 960px; }
+.assistant-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+#assistant-log { max-height: 55vh; overflow-y: auto; }
+#assistant-log:not(:empty) { margin-bottom: 16px; }
+.assistant-message { background: #101725; border: 1px solid #354054; border-radius: 10px; padding: 14px; margin: 8px 0; }
+.assistant-message strong { color: #8bd0e0; }
+.assistant-message p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; margin: 8px 0; }
+.assistant-message details { margin-top: 8px; padding: 8px; border-left: 2px solid #365063; }
+.assistant-message summary { cursor: pointer; overflow-wrap: anywhere; }
+.assistant-message dl { display: grid; grid-template-columns: minmax(80px, 1fr) 3fr; gap: 6px 12px; }
+.assistant-message dt { color: #9ca9bc; }
+.assistant-message dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+#assistant-question { display: block; width: 100%; margin-top: 7px; padding: 11px; resize: vertical; }
+#assistant-question:focus-visible { outline: 2px solid #64b5ca; }
+.assistant-actions { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 9px; }
+#assistant-status { color: #b2c6d7; }
