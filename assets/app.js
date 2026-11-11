@@ -103,7 +103,21 @@
     client=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey,{
       auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}
     });
-    assistant=window.createAtlasAssistant(client,()=>user,openAgency);
+    assistant=window.createAtlasAssistant(client,()=>user,{
+      openAgency,
+      openTeam:()=>switchView('team'),
+      openState:(code)=>{
+        clearTimeout(searchTimer);
+        Object.assign(state,{q:'',state:code,type:'',contact:''});
+        $('search-input').value='';
+        $('state-filter').value=code;
+        $('type-filter').value='';
+        $('contact-filter').value='';
+        page=0;
+        switchView('agencies');
+        loadAgencies();
+      },
+    });
     try {
       const {data:{session},error}=await client.auth.getSession();if(error)throw error;
       if(session?.user){await checkAccess(session.user);}else show('login-screen');
@@ -262,7 +276,7 @@
       toast('Saved. Team attribution was recorded.');
     }catch(err){input.checked=!value;input.disabled=false;toast('Could not save: '+err.message,true);}
   }
-  async function openAgency(ori){
+  async function openAgency(ori,{focusFollowup=false}={}){
     try{
       const [agency,activity,attrs]=await Promise.all([
         client.from('reconero_agencies').select('*').eq('ori',ori).single(),
@@ -282,6 +296,7 @@
       const owners='<option value="">Unassigned</option>'+teamProfiles.map(p=>`<option value="${esc(p.user_id)}" ${r.owner_id===p.user_id?'selected':''}>${esc(p.display_name)}</option>`).join('');
       const events=(activity.data||[]);
       const body=`<div class="info">${esc(r.ori)} · ${esc(r.state)} · ${esc(r.agency_type||'Law enforcement agency')} ${r.county?'· '+esc(r.county):''}</div>
+        <button type="button" id="ask-agency" class="button outline small">Ask Atlas about this agency</button>
         <div class="activity-hint">${METHODS.some(m=>r[m]&&!(attribution.get(m)||[]).length)?'Gray question marks mean an outreach checkmark predates team tracking. Its author is unknown.':''}</div>
         <form id="agency-form"><div class="section-label">OUTREACH ACTIVITY</div><div class="touch-list">${touch}</div>
         <p class="helper">Check or uncheck an outreach method and save. To log a second attempt—or a teammate’s attempt—use a button below; it keeps the first person’s history.</p>
@@ -310,6 +325,11 @@
         <div class="activity-list">${events.length?events.map(activityLine).join(''):'<p class="helper">No team activity yet. Older checkmarks cannot be assigned retroactively.</p>'}</div>
         <p class="helper">Showing the ${Math.min(events.length,80)} most recent events. Times are displayed in your local time zone.</p>`;
       openDrawer(r.name,body);
+      $('ask-agency').addEventListener('click',()=>{
+        switchView('assistant');
+        assistant.focusAgency({ori:r.ori,name:r.name});
+      });
+      if(focusFollowup)$('drawer-content').querySelector('[name=next_followup]')?.focus();
       $('cancel-edit').addEventListener('click',closeDrawer);
       $('agency-form').addEventListener('submit',async e=>{
         e.preventDefault();const btn=$('agency-save');btn.disabled=true;
