@@ -8,7 +8,7 @@
   <meta name="description" content="Reconero Atlas: private nationwide law-enforcement outreach tracker.">
   <title>Reconero Atlas — Agency Outreach</title>
   <link rel="icon" href="assets/favicon.png" type="image/png">
-  <link rel="stylesheet" href="assets/styles.css?v=assistant-1">
+  <link rel="stylesheet" href="assets/styles.css?v=assistant-2">
 </head>
 <body>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -263,6 +263,10 @@
         </div>
         <div class="team-section-card assistant-panel">
           <p class="helper">Questions and selected Atlas fields are sent to Gemini. Avoid entering confidential or personal information. Chat history stays in this page until you clear it, reload, or sign out.</p>
+          <div id="assistant-scope" class="assistant-examples hidden">
+            <span id="assistant-scope-name"></span>
+            <button id="assistant-scope-clear" type="button" class="button outline small">Search all agencies</button>
+          </div>
           <div id="assistant-examples" class="assistant-examples">
             <button type="button" class="button outline small">Who should we contact next?</button>
             <button type="button" class="button outline small">Which follow-ups are due?</button>
@@ -301,7 +305,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="config.js"></script>
-  <script src="assets/assistant.js?v=2"></script>
-  <script src="assets/app.js?v=assistant-1"></script>
+  <script src="assets/assistant.js?v=4"></script>
+  <script src="assets/app.js?v=assistant-3"></script>
 </body>
 </html>
