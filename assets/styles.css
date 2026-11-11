@@ -62,3 +62,11 @@
 #assistant-question:focus-visible { outline: 2px solid #64b5ca; }
 .assistant-actions { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 9px; }
 #assistant-status { color: #b2c6d7; }
+
+.assistant-results { margin-top: 16px; }
+.assistant-results h3 { margin: 0 0 6px; font-size: 14px; }
+.assistant-results small { color: #aab8ce; }
+.assistant-result-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 10px; margin-top: 10px; }
+.assistant-result-card { padding: 12px; border: 1px solid #354054; border-radius: 9px; background: #172233; }
+.assistant-result-card h4 { margin: 0 0 6px; color: #e7f5fa; overflow-wrap: anywhere; }
+.assistant-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
