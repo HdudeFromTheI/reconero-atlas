@@ -36,7 +36,7 @@
   const getErr = res => { if (res.error) throw res.error; return res.data; };
   const closeDrawer = () => {show('overlay',false); $('overlay').setAttribute('aria-hidden','true');};
   const openDrawer = (title, body, eyebrow='AGENCY DETAILS') => { $('drawer-title').textContent=title;$('drawer-eyebrow').textContent=eyebrow;$('drawer-content').innerHTML=body;show('overlay');$('overlay').setAttribute('aria-hidden','false');$('close-drawer').focus(); };
-  let client, user, page=0, rows=[], totalResults=0, searchTimer, toastTimer, loadId=0;
+  let client, user, assistant, page=0, rows=[], totalResults=0, searchTimer, toastTimer, loadId=0;
   let teamProfiles=[], profileLookup=new Map(), attributionLookup=new Map(), currentView='agencies', teamWindow='7d';
   const profileOf=id=>profileLookup.get(id)||{user_id:id,display_name:'Former / unlisted member',color:'#94A3B8'};
   const contributorKey=(ori,method)=>ori+'|'+method;
@@ -79,7 +79,7 @@
   async function start() {
     $('state-filter').insertAdjacentHTML('beforeend',stateOptions());
     $('login-form').addEventListener('submit',signIn);
-    $('logout').addEventListener('click',async()=>{await client.auth.signOut();user=null;show('dashboard',false);show('login-screen');});
+    $('logout').addEventListener('click',async()=>{await client.auth.signOut();assistant?.reset();user=null;switchView('agencies');show('dashboard',false);show('login-screen');});
     $('search-input').addEventListener('input',e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{state.q=e.target.value.trim();page=0;loadAgencies();},280);});
     [['state-filter','state'],['type-filter','type'],['contact-filter','contact']].forEach(([id,key])=>$(id).addEventListener('change',e=>{state[key]=e.target.value;page=0;loadAgencies();}));
     $('prev-page').addEventListener('click',()=>{if(page>0){page--;loadAgencies();}});
@@ -88,6 +88,7 @@
     $('nav-agencies').addEventListener('click',e=>{e.preventDefault();switchView('agencies');window.scrollTo({top:0,behavior:'smooth'});});
     $('nav-import').addEventListener('click',openImport);
     $('nav-bulk').addEventListener('click',openBulk);
+    $('nav-assistant').addEventListener('click',()=>switchView('assistant'));
     $('nav-team').addEventListener('click',()=>switchView('team'));
     $('team-window').addEventListener('change',e=>{teamWindow=e.target.value;loadTeam();});
     $('add-button').addEventListener('click',openAdd);
@@ -102,6 +103,7 @@
     client=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey,{
       auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}
     });
+    assistant=window.createAtlasAssistant(client,()=>user,openAgency);
     try {
       const {data:{session},error}=await client.auth.getSession();if(error)throw error;
       if(session?.user){await checkAccess(session.user);}else show('login-screen');
@@ -119,6 +121,7 @@
     const {data,error}=await client.rpc('reconero_is_member');
     if(error)throw error;
     if(data!==true){await client.auth.signOut();show('login-screen');$('login-error').textContent='This account is not on the authorized-user list. Add its UUID in Supabase SQL Editor.';return;}
+    if(user?.id!==candidate.id)assistant.reset();
     user=candidate;show('login-screen',false);show('setup-screen',false);show('dashboard');$('user-email').textContent=user.email;$('user-avatar').textContent=(user.email||'R')[0].toUpperCase();
     await loadProfiles();
     await Promise.all([refresh(),loadAgencyTypes()]);
@@ -142,10 +145,11 @@
   }
   function switchView(view){
     currentView=view;closeDrawer();
-    show('agency-view',view==='agencies');show('team-view',view==='team');
+    show('agency-view',view==='agencies');show('team-view',view==='team');show('assistant-view',view==='assistant');
     $('nav-agencies').classList.toggle('active',view==='agencies');
     $('nav-team').classList.toggle('active',view==='team');
-    $('breadcrumb-section').textContent=view==='team'?'Team performance':'Agency directory';
+    $('nav-assistant').classList.toggle('active',view==='assistant');
+    $('breadcrumb-section').textContent={agencies:'Agency directory',team:'Team performance',assistant:'Atlas assistant'}[view];
     window.scrollTo({top:0,behavior:'smooth'});
     if(view==='team')loadTeam();
   }
